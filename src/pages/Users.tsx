@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { fetchUsers, User } from '@/store/slices/usersSlice';
-import { logout } from '@/store/slices/authSlice';
+import { logoutUser } from '@/store/slices/authSlice'; // ✅ updated import
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/users/Header';
 import SearchBar from '@/components/users/SearchBar';
@@ -19,7 +19,9 @@ const Users = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { users, loading } = useSelector((state: RootState) => state.users);
-  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, loading: authLoading } = useSelector(
+    (state: RootState) => state.auth
+  );
 
   const [view, setView] = useState<'table' | 'card'>('table');
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +32,7 @@ const Users = () => {
 
   const itemsPerPage = 5;
 
+  // ✅ Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -38,9 +41,15 @@ const Users = () => {
     dispatch(fetchUsers(1));
   }, [dispatch, isAuthenticated, navigate]);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
+  // ✅ Secure Logout Handler (calls /logout API)
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      alert('Logout failed. Please try again.');
+    }
   };
 
   const handleEdit = (user: User) => {
@@ -65,7 +74,10 @@ const Users = () => {
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -74,7 +86,7 @@ const Users = () => {
   return (
     <div className="min-h-screen bg-background">
       <Header onLogout={handleLogout} />
-      
+
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="bg-card rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
@@ -87,7 +99,7 @@ const Users = () => {
 
           <ViewToggle view={view} onViewChange={setView} />
 
-          {loading ? (
+          {loading || authLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>

@@ -1,6 +1,6 @@
 import api from '@/services/api';
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-
+import CryptoJS from 'crypto-js';
 
 interface AuthState {
   token: string | null;
@@ -10,19 +10,31 @@ interface AuthState {
 }
 
 const initialState: AuthState = {
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  token: sessionStorage.getItem('token'),
+  isAuthenticated: !!sessionStorage.getItem('token'),
   loading: false,
   error: null,
 };
 
+const SECRET_KEY = import.meta.env.VITE_TOKEN_SECRET || 'fallback-secret';
+
 export const login = createAsyncThunk(
   'auth/login',
-  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+  async (
+    credentials: { email: string; password: string },
+    { rejectWithValue }
+  ) => {
     try {
       const response = await api.post('/login', credentials);
-      localStorage.setItem('token', response.data.token);
-      return response.data.token;
+      const token = response.data.token;
+
+      // ✅ Encrypt token using AES
+      const encryptedToken = CryptoJS.AES.encrypt(token, SECRET_KEY).toString();
+
+      // Store encrypted token in sessionStorage
+      sessionStorage.setItem('authToken', encryptedToken);
+
+      return token; // or return response.data if you need user info
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || 'Login failed');
     }
@@ -36,7 +48,7 @@ const authSlice = createSlice({
     logout: (state) => {
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
     },
   },
   extraReducers: (builder) => {
